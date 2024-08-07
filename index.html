@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.ico">
+  <title>Jogo de Asteroides</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: black;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #000;
+    }
+
+    #player {
+      position: absolute;
+      bottom: 20px;
+      width: 50px;
+      height: 50px;
+      background-image: url('nave.png'); /* Substitua 'nave.png' pela URL da imagem da nave */
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+
+    .bullet {
+      position: absolute;
+      width: 30px; /* Ajuste a largura conforme necessário */
+      height: 60px; /* Ajuste a altura conforme necessário */
+      background-image: url('bullet.png'); /* Substitua 'bullet.png' pela URL da imagem do tiro */
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+
+    .asteroid {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background-image: url('asteroid.png'); /* Substitua 'asteroid.png' pela URL da imagem do asteroide */
+      background-size: contain;
+      background-repeat: no-repeat;
+      top: 0;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 24px;
+    }
+
+    .message {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 48px;
+      text-align: center;
+      z-index: 10;
+    }
+
+    .message button {
+      display: block;
+      margin: 20px auto 0;
+      padding: 10px 20px;
+      font-size: 20px;
+      cursor: pointer;
+      background-color: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    #start-message {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="player"></div>
+    <div id="score">Score: 0</div>
+    <div id="start-message" class="message">
+      Bem-vindo!
+      <button id="start-button">Play</button>
+    </div>
+    <div id="game-over-message" class="message">
+      Game Over!
+      <button id="restart-button">Reiniciar</button>
+    </div>
+  </div>
+  <script>
+    const player = document.getElementById('player');
+    const gameContainer = document.getElementById('game-container');
+    const scoreDisplay = document.getElementById('score');
+    const startMessage = document.getElementById('start-message');
+    const startButton = document.getElementById('start-button');
+    const gameOverMessage = document.getElementById('game-over-message');
+    const restartButton = document.getElementById('restart-button');
+
+    let score = 0;
+    let gameInterval;
+    let movePlayerInterval;
+    let playerLeft = 0;
+    let isMovingLeft = false;
+    let isMovingRight = false;
+
+    // Função para criar um asteroide
+    function createAsteroid() {
+      const asteroid = document.createElement('div');
+      asteroid.classList.add('asteroid');
+
+      // Define a área de nascimento dos asteroides
+      const minAsteroidX = gameContainer.clientWidth * 0.4; // 40% da largura do contêiner
+      const maxAsteroidX = gameContainer.clientWidth * 0.6 - 40; // 60% da largura do contêiner menos a largura do asteroide
+
+      asteroid.style.left = Math.random() * (maxAsteroidX - minAsteroidX) + minAsteroidX + 'px';
+      gameContainer.appendChild(asteroid);
+
+      let asteroidInterval = setInterval(() => {
+        const asteroidTop = parseInt(window.getComputedStyle(asteroid).getPropertyValue('top'));
+        if (asteroidTop >= gameContainer.clientHeight - 40) {
+          gameContainer.removeChild(asteroid);
+          clearInterval(asteroidInterval);
+          endGame();
+        } else {
+          asteroid.style.top = asteroidTop + 3 + 'px'; // Velocidade reduzida dos asteroides
+        }
+
+        // Checa colisão com a nave
+        if (checkCollision(player, asteroid)) {
+          gameContainer.removeChild(asteroid);
+          clearInterval(asteroidInterval);
+          endGame();
+        }
+      }, 30);
+    }
+
+    // Função para atirar
+    function shoot() {
+      const bullet = document.createElement('div');
+      bullet.classList.add('bullet');
+      bullet.style.left = player.offsetLeft + (player.clientWidth / 2) - 5 + 'px'; // Ajuste para centralizar a imagem do tiro
+      bullet.style.bottom = '70px';
+      gameContainer.appendChild(bullet);
+
+      let bulletInterval = setInterval(() => {
+        const bulletBottom = parseInt(window.getComputedStyle(bullet).getPropertyValue('bottom'));
+        if (bulletBottom >= gameContainer.clientHeight) {
+          gameContainer.removeChild(bullet);
+          clearInterval(bulletInterval);
+        } else {
+          bullet.style.bottom = bulletBottom + 10 + 'px';
+        }
+
+        // Checa colisão com asteroide
+        document.querySelectorAll('.asteroid').forEach(asteroid => {
+          if (checkCollision(bullet, asteroid)) {
+            gameContainer.removeChild(asteroid);
+            gameContainer.removeChild(bullet);
+            clearInterval(bulletInterval);
+            score += 10;
+            scoreDisplay.textContent = 'Score: ' + score;
+          }
+        });
+      }, 30);
+    }
+
+    // Função para checar colisão
+    function checkCollision(a, b) {
+      const aRect = a.getBoundingClientRect();
+      const bRect = b.getBoundingClientRect();
+      return (
+        aRect.x < bRect.x + bRect.width &&
+        aRect.x + aRect.width > bRect.x &&
+        aRect.y < bRect.y + bRect.height &&
+        aRect.y + aRect.height > bRect.y
+      );
+    }
+
+    // Função para terminar o jogo
+    function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(movePlayerInterval);
+      document.querySelectorAll('.asteroid').forEach(asteroid => asteroid.remove());
+      gameOverMessage.style.display = 'block';
+    }
+
+    // Função para mover a nave
+    function movePlayer() {
+      if (isMovingLeft && playerLeft > 0) {
+        playerLeft -= 10; // Aumenta a velocidade da nave para a esquerda
+      }
+      if (isMovingRight && playerLeft < gameContainer.clientWidth - player.clientWidth) {
+        playerLeft += 10; // Aumenta a velocidade da nave para a direita
+      }
+      player.style.left = playerLeft + 'px';
+    }
+
+    // Inicializa o jogo
+    function startGame() {
+      startMessage.style.display = 'none';
+      gameOverMessage.style.display = 'none';
+      score = 0;
+      scoreDisplay.textContent = 'Score: ' + score;
+
+      // Centraliza a nave
+      playerLeft = (gameContainer.clientWidth - player.clientWidth) / 2;
+      player.style.left = playerLeft + 'px';
+
+      // Inicia os intervalos para criar asteroides e mover a nave
+      gameInterval = setInterval(createAsteroid, 1000);
+      movePlayerInterval = setInterval(movePlayer, 30);
+    }
+
+    // Função para reiniciar o jogo
+    function restartGame() {
+      gameOverMessage.style.display = 'none';
+      startGame();
+    }
+
+    // Inicia o jogo ao carregar a página
+    window.onload = () => {
+      startMessage.style.display = 'block';
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+          isMovingLeft = true;
+        }
+        if (e.key === 'ArrowRight') {
+          isMovingRight = true;
+        }
+        if (e.key === ' ') {
+          shoot();
+        }
+      });
+      document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft') {
+          isMovingLeft = false;
+        }
+        if (e.key === 'ArrowRight') {
+          isMovingRight = false;
+        }
+      });
+      startButton.addEventListener('click', startGame);
+      restartButton.addEventListener('click', restartGame);
+    };
+  </script>
+</body>
+</html>
